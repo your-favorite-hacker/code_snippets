@@ -1,16 +1,21 @@
 #!/usr/bin/env python2
 #
-# ./find_dns.py -l IPs.txt -t 500 -o ntpservers.txt
+# ./find_dns.py -l IPs.txt -t 500 -o dnsservers.txt
 #
 # simple dns server finder by dash
 #
-# [*] Found 148 entries
-# [*] Entries 148 in queue
-# [*] Running with 50 threads
-# ==================================================
-# IP
-# ==================================================
-#
+#./find_dns.py -l rIP.txt -t 100 
+#[*] Found 1001 entries
+#[*] Entries 1001 in queue
+#[*] Running with 100 threads
+#==================================================
+#IP          NAME
+#==================================================
+#91.x.x.x   (x.info)
+#191.x.x.x  (191.x.br)
+#67.x.x.x   (name.info)
+#==================================================
+#[*] Done
 #
 
 import os
@@ -33,7 +38,7 @@ def openWriteFile(outfile):
 	return fw
 
 def checkDNS(host):
-	payload = 'J\x8e\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03web\x02de\x00\x00\x01\x00\x01'
+	payload = 'J\x8e\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03hotmail\x02de\x00\x00\x01\x00\x01'
 	# settimeout so recv is not block
 	try:
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -88,10 +93,10 @@ def run(args):
 	while q.qsize()>0:
 		
 		if len(thrList) < thrCnt:
-			thrNtp = threading.Thread(target = checkDNS, args = (q.get(),))
-			thrNtp.daemon = True
-			thrNtp.start()
-			thrList.append(thrNtp)
+			thrDns = threading.Thread(target = checkDNS, args = (q.get(),))
+			thrDns.daemon = True
+			thrDns.start()
+			thrList.append(thrDns)
 		
 		for entry in thrList:
 			if entry.isAlive()==False:
