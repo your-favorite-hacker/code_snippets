@@ -64,6 +64,25 @@ IP          NAME
 ==================================================
 [*] Done
 
+Also it has some extra options now:
+find_dns.py [-h] -l HOSTLIST [-t THRCNT] [-o OUTFILE] [-n] [-d DOMAIN]
+
+dns server finder, by dash
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -l HOSTLIST  host list with ips
+  -t THRCNT    thread count
+  -o OUTFILE   write found data to file
+  -n           do not resolve ips
+  -d DOMAIN    choose the domain for the dns request
+
+If you do not like to resolve the ips via default 8.8.8.8 (google dns cluster)
+choose -n. If you want to use a different domain being requested in the 
+payload use -d. Default domain is: google.com
+
+example:
+./find_dns.py -l rIP.txt -t 100 -n -d microsoft.com
 
 Author
 ------

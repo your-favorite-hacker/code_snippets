@@ -21,6 +21,7 @@
 import os
 import sys
 import Queue
+import struct
 import socket
 import argparse
 import threading
@@ -37,8 +38,21 @@ def openWriteFile(outfile):
 	fw = open(outfile,'wb')
 	return fw
 
-def checkDNS(host):
-	payload = 'J\x8e\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03hotmail\x02de\x00\x00\x01\x00\x01'
+def parseDomain(domain):
+	do = domain.split('.')
+	if len(do) != 2:
+		print '[!] Sorry, unknown domain type: %s\nExample:google.com' % (domain)
+		return False
+	tld = do[1]
+	tld_len = struct.pack('>B', len(tld))
+	tld_sub = do[0]
+	tld_sub_len = struct.pack('>B', len(tld_sub))
+	dom_pay = '%c%s%c%s' % (tld_sub_len,tld_sub,tld_len,tld)
+	return dom_pay
+	
+	
+
+def checkDNS(payload,host,resolv):
 	# settimeout so recv is not block
 	try:
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -47,16 +61,20 @@ def checkDNS(host):
 		s.send(payload)
 		rBuf = s.recv(1024)
 		name = ''
-		try:
-			name = socket.gethostbyaddr(host)[0]
-		except socket.herror,e:
-			pass
+		# default we resolve IPs as long as -n is not choosen
+		if resolv:
+			try:
+				name = socket.gethostbyaddr(host)[0]
+			except socket.herror,e:
+				pass
+
 		if name == '':
 			print '%s' % (host)
 			data = '%s\n' % (host)
 		else:
 			print '%s\t(%s)' % (host,name)
 			data = '%s\t(%s)\n' % (host,name)
+
 		rQ.put(data)
 	except socket.error,e:
 #		print e
@@ -73,6 +91,9 @@ def run(args):
 	
 	if args.outfile:
 		fw = openWriteFile(args.outfile)
+
+	dom_pay = parseDomain(args.domain)
+	payload = 'J\x8e\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00%s\x00\x00\x01\x00\x01' % (dom_pay)
 	
 	hostList = args.hostList
 
@@ -93,7 +114,7 @@ def run(args):
 	while q.qsize()>0:
 		
 		if len(thrList) < thrCnt:
-			thrDns = threading.Thread(target = checkDNS, args = (q.get(),))
+			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv))
 			thrDns.daemon = True
 			thrDns.start()
 			thrList.append(thrDns)
@@ -126,6 +147,8 @@ def main():
 	parser.add_argument("-l",action='store',required=True,help='host list with ips',dest='hostList')
 	parser.add_argument('-t',action='store',required=False,help='thread count', dest='thrCnt')
 	parser.add_argument('-o',action='store',required=False,help='write found data to file', dest='outfile')
+	parser.add_argument('-n',action='store_false',default=True,required=False,help='do not resolve ips', dest='resolv')
+	parser.add_argument('-d',action='store',default='google.com',required=False,help='choose the domain for the dns request', dest='domain')
 	args = parser.parse_args()
 	run(args)
 
