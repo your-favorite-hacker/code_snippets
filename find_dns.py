@@ -20,6 +20,7 @@
 
 import os
 import sys
+import time
 import Queue
 import struct
 import socket
@@ -52,14 +53,16 @@ def parseDomain(domain):
 	
 	
 
-def checkDNS(payload,host,resolv):
+def checkDNS(payload,host,resolv,debug):
 	# settimeout so recv is not block
+	rBuf_len = -1
 	try:
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		s.settimeout(3)
+		s.settimeout(5)
 		s.connect((host,53))
 		s.send(payload)
 		rBuf = s.recv(1024)
+		rBuf_len = len(rBuf)
 		name = ''
 		# default we resolve IPs as long as -n is not choosen
 		if resolv:
@@ -69,11 +72,19 @@ def checkDNS(payload,host,resolv):
 				pass
 
 		if name == '':
-			print '%s' % (host)
-			data = '%s\n' % (host)
+			if debug:
+				print '%s\t%d\t%s' % (host,rBuf_len,repr(rBuf))
+				data = '%s%d\t%s\n' % (host,rBuf_len,repr(rBuf))
+			else:
+				print '%s\t%d' % (host,rBuf_len)
+				data = '%s%d\n' % (host,rBuf_len)
 		else:
-			print '%s\t(%s)' % (host,name)
-			data = '%s\t(%s)\n' % (host,name)
+			if debug:
+				print '%s\t(%s) %d\t%s' % (host,name,rBuf_len,repr(rBuf))
+				data = '%s\t(%s) %d\t%s\n' % (host,name,rBuf_len,repr(rBuf))
+			else:
+				print '%s\t(%s) %d' % (host,name,rBuf_len)
+				data = '%s\t(%s) %d\n' % (host,name,rBuf_len)
 
 		rQ.put(data)
 	except socket.error,e:
@@ -108,13 +119,18 @@ def run(args):
 	print '[*] Entries %d in queue' % q.qsize()
 	print '[*] Running with %d threads' % thrCnt
 	print '='*50
-	print 'IP\t\tNAME'
+	if args.resolv:
+		print 'IP\t\tNAME\tPaylen'
+	else:
+		print 'IP\t\tPaylen'
+
 	print '='*50
 	thrList = []
-	while q.qsize()>0:
+	while True:
+	#while q.qsize()>0:
 		
-		if len(thrList) < thrCnt:
-			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv))
+		if len(thrList) < thrCnt and q.qsize()>0:
+			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv,args.debug))
 			thrDns.daemon = True
 			thrDns.start()
 			thrList.append(thrDns)
@@ -133,6 +149,9 @@ def run(args):
 			if rQ.qsize()>0:
 				rQ.get()
 
+		if q.qsize()==0 and len(thrList) == 0:
+			break
+	
 	if args.outfile:
 		fw.close()
 	print '='*50
@@ -149,6 +168,7 @@ def main():
 	parser.add_argument('-o',action='store',required=False,help='write found data to file', dest='outfile')
 	parser.add_argument('-n',action='store_false',default=True,required=False,help='do not resolve ips', dest='resolv')
 	parser.add_argument('-d',action='store',default='google.com',required=False,help='choose the domain for the dns request', dest='domain')
+	parser.add_argument('--debug',action='store_true',default=False,required=False,help='debug output', dest='debug')
 	args = parser.parse_args()
 	run(args)
 
