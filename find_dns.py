@@ -24,6 +24,7 @@ import time
 import Queue
 import struct
 import socket
+import random
 import argparse
 import threading
 
@@ -120,16 +121,22 @@ def run(args):
 	print '[*] Running with %d threads' % thrCnt
 	print '='*50
 	if args.resolv:
-		print 'IP\t\tNAME\tPaylen'
+		print 'IP\t\tNAME\tPAYLEN'
 	else:
-		print 'IP\t\tPaylen'
+		print 'IP\t\tPAYLEN'
 
 	print '='*50
 	thrList = []
 	while True:
-	#while q.qsize()>0:
 		
 		if len(thrList) < thrCnt and q.qsize()>0:
+
+			# enable random transaction ids
+			if args.randTrans:
+				rd = random.randint(0,65535)
+				rd_pack = struct.pack('>H',rd)
+				payload = '%s%s' % (rd_pack,payload[2:]) 
+
 			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv,args.debug))
 			thrDns.daemon = True
 			thrDns.start()
@@ -168,6 +175,7 @@ def main():
 	parser.add_argument('-o',action='store',required=False,help='write found data to file', dest='outfile')
 	parser.add_argument('-n',action='store_false',default=True,required=False,help='do not resolve ips', dest='resolv')
 	parser.add_argument('-d',action='store',default='google.com',required=False,help='choose the domain for the dns request', dest='domain')
+	parser.add_argument('-r',action='store_false',default=True,required=False,help='deactivate random transaction ids', dest='randTrans')
 	parser.add_argument('--debug',action='store_true',default=False,required=False,help='debug output', dest='debug')
 	args = parser.parse_args()
 	run(args)
