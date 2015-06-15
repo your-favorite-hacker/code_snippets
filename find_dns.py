@@ -2,7 +2,8 @@
 #
 # ./find_dns.py -l IPs.txt -t 500 -o dnsservers.txt
 #
-# simple dns server finder by dash
+# dns-server finder by dash
+# 
 #
 #./find_dns.py -l rIP.txt -t 100 
 #[*] Found 1001 entries
@@ -54,7 +55,7 @@ def parseDomain(domain):
 	
 	
 
-def checkDNS(payload,host,resolv,debug):
+def checkDNS(payload,host,resolv,debug,version):
 	# settimeout so recv is not block
 	rBuf_len = -1
 	try:
@@ -72,13 +73,27 @@ def checkDNS(payload,host,resolv,debug):
 			except socket.herror,e:
 				pass
 
+		if version:
+			# FEFE packet!
+			ver_req = '\xfe\xfe\x01 \x00\x01\x00\x00\x00\x00\x00\x01\x07version\x04bind\x00\x00\x10\x00\x03\x00\x00)\x10\x00\x00\x00\x00\x00\x00\x00'
+			try:
+				s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+				s.settimeout(3)
+				s.connect((host,53))
+				s.send(ver_req)
+				vBuf = s.recv(1024)
+			except socket.error,e:
+				vBuf = ''
+				pass
+				
+
 		if name == '':
 			if debug:
-				print '%s\t%d\t%s' % (host,rBuf_len,repr(rBuf))
-				data = '%s%d\t%s\n' % (host,rBuf_len,repr(rBuf))
+				print '%s\t%d\t%s\t%s' % (host,rBuf_len,repr(rBuf),repr(vBuf))
+				data = '%s\t%d\t%s\t%s\n' % (host,rBuf_len,repr(rBuf),repr(vBuf))
 			else:
 				print '%s\t%d' % (host,rBuf_len)
-				data = '%s%d\n' % (host,rBuf_len)
+				data = '%s\t%d\n' % (host,rBuf_len)
 		else:
 			if debug:
 				print '%s\t(%s) %d\t%s' % (host,name,rBuf_len,repr(rBuf))
@@ -127,8 +142,16 @@ def run(args):
 
 	print '='*50
 	thrList = []
+	org_qlen = float(q.qsize())
 	while True:
 		
+		#TODO percents calc
+		#qlen = q.qsize()
+		#cur_cnt = (qlen / org_qlen) * 100
+		#cur_cnt = int(100 - cur_cnt)
+		#if cur_cnt % 5 == 0 and cur_cnt != 0:
+			#print '='*20+' %d ' % (cur_cnt)+'='*20
+
 		if len(thrList) < thrCnt and q.qsize()>0:
 
 			# enable random transaction ids
@@ -137,7 +160,7 @@ def run(args):
 				rd_pack = struct.pack('>H',rd)
 				payload = '%s%s' % (rd_pack,payload[2:]) 
 
-			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv,args.debug))
+			thrDns = threading.Thread(target = checkDNS, args = (payload,q.get(),args.resolv,args.debug,args.version))
 			thrDns.daemon = True
 			thrDns.start()
 			thrList.append(thrDns)
@@ -176,8 +199,16 @@ def main():
 	parser.add_argument('-n',action='store_false',default=True,required=False,help='do not resolve ips', dest='resolv')
 	parser.add_argument('-d',action='store',default='google.com',required=False,help='choose the domain for the dns request', dest='domain')
 	parser.add_argument('-r',action='store_false',default=True,required=False,help='deactivate random transaction ids', dest='randTrans')
+	parser.add_argument('-v',action='store_true',default=False,required=False,help='grab version from dns server enable debug mode for it! (experimental!)', dest='version')
+	parser.add_argument('-V',action='store_true',default=False,required=False,help='print version information', dest='versinfo')
 	parser.add_argument('--debug',action='store_true',default=False,required=False,help='debug output', dest='debug')
+
 	args = parser.parse_args()
+	# add some more info here sometime
+	if args.versinfo:
+		print desc
+		sys.exit(23)
+
 	run(args)
 
 if __name__ == "__main__":
